@@ -5,8 +5,8 @@ RUN apt-get update --allow-releaseinfo-change || true \
     && apt-get install -y libpq-dev zlib1g-dev pkg-config
 
 # Copy dependency files first to cache them
-COPY stack.yaml package.yaml noise-backend.cabal ./
-RUN stack build --only-dependencies
+COPY stack.yaml stack.yaml.lock package.yaml noise-backend.cabal ./
+RUN mkdir app src && stack build --only-dependencies
 
 # Copy source code and build
 COPY . .
