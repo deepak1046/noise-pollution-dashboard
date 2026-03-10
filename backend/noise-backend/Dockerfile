@@ -2,8 +2,11 @@
 FROM haskell:9.4 AS builder
 WORKDIR /app
 
+# Install necessary system libraries that Haskell modules might depend on (e.g. for network or zlib)
+RUN apt-get update && apt-get install -y libpq-dev zlib1g-dev pkg-config
+
 # Copy dependency files first to cache them
-COPY stack.yaml package.yaml ./
+COPY stack.yaml package.yaml noise-backend.cabal ./
 RUN stack build --only-dependencies
 
 # Copy source code and build

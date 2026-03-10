@@ -29,6 +29,7 @@ library
     , bytestring
     , cassava
     , containers
+    , http-types
     , scotty
     , statistics
     , text
