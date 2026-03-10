@@ -1,0 +1,32 @@
+name: noise-backend
+version: 0.1.0.0
+
+dependencies:
+- base >= 4.7 && < 5
+- wai-cors
+
+library:
+  source-dirs: src
+  dependencies:
+  - base >= 4.7 && < 5
+  - http-types
+  - cassava
+  - vector
+  - aeson
+  - scotty
+  - text
+  - containers
+  - time
+  - statistics
+  - bytestring
+
+executables:
+  noise-backend-exe:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+    - noise-backend
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N

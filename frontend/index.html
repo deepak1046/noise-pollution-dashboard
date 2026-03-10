@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Urban Noise Pollution Dashboard | Fully Fixed</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Tailwind + Chart.js + Leaflet -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    
+    /* Smooth scrolling */
+    html { scroll-behavior: smooth; }
+    
+    /* Animations */
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    @keyframes slideIn { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+    @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    .animate-pulse-slow { animation:pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    .slide-in { animation:slideIn 0.5s ease-out forwards; }
+    .animate-spin-slow { animation:spin 2s linear infinite; }
+    
+    /* Cards */
+    .card-hover { transition:all 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .card-hover:hover { transform:translateY(-4px); box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); }
+    
+    /* Chart containers */
+    .chart-container {
+      background: white;
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 10px 40px -15px rgba(0,0,0,0.1);
+      height: 420px;
+      transition: all 0.3s ease;
+    }
+    body.dark .chart-container {
+      background: #1f2937;
+      color: #f3f4f6;
+    }
+    .chart-wrapper { position:relative; height:calc(100% - 50px); width:100%; }
+    
+    /* Noise indicators */
+    .noise-indicator { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:6px; }
+    .noise-safe { background:#10b981; box-shadow:0 0 10px #10b981; }
+    .noise-moderate { background:#f59e0b; box-shadow:0 0 10px #f59e0b; }
+    .noise-high { background:#ef4444; box-shadow:0 0 10px #ef4444; }
+    
+    /* Toast */
+    .toast {
+      position:fixed; bottom:20px; right:20px; background:#1e293b; color:white; padding:12px 24px;
+      border-radius:50px; box-shadow:0 10px 25px rgba(0,0,0,0.2); transform:translateY(100px);
+      opacity:0; transition:all 0.3s ease; z-index:1000;
+    }
+    .toast.show { transform:translateY(0); opacity:1; }
+    
+    /* Loading overlay */
+    .loading-overlay {
+      position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5);
+      backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:999;
+    }
+    .loading-overlay.show { display:flex; }
+    .loading-spinner { width:50px; height:50px; border:4px solid #fff; border-top-color:#3b82f6; border-radius:50%; animation:spin 1s linear infinite; }
+    
+    /* Dark mode */
+    body.dark { background-color:#111827; }
+    body.dark .bg-white { background-color:#1f2937; color:#f3f4f6; }
+    body.dark .text-gray-800 { color:#f3f4f6; }
+    body.dark .text-gray-500 { color:#9ca3af; }
+    body.dark .border-gray-200 { border-color:#374151; }
+    body.dark .bg-gray-50 { background-color:#374151; }
+    body.dark .bg-gray-100 { background-color:#2d3748; }
+    /* Dark mode form elements */
+    body.dark input, body.dark select, body.dark textarea {
+      background-color:#374151;
+      color:#f3f4f6;
+      border-color:#4b5563;
+    }
+    body.dark input::placeholder, body.dark select::placeholder {
+      color:#9ca3af;
+    }
+    body.dark option {
+      background-color:#1f2937;
+      color:#f3f4f6;
+    }
+    body.dark .border { border-color:#4b5563; }
+    
+    /* Dark mode table enhancements */
+    body.dark th {
+      color: #d1d5db; /* gray-300 */
+    }
+    body.dark td {
+      color: #f3f4f6; /* gray-100 */
+    }
+    body.dark .bg-red-100 {
+      background-color: #7f1d1d; /* dark red-900 */
+      color: #fecaca; /* red-100 */
+    }
+    body.dark .bg-green-100 {
+      background-color: #064e3b; /* dark green-900 */
+      color: #d1fae5; /* green-100 */
+    }
+    body.dark .bg-yellow-100 {
+      background-color: #78350f; /* dark yellow-900 */
+      color: #fef3c7; /* yellow-100 */
+    }
+    /* Dark mode for action buttons in table */
+    body.dark .text-blue-500 { color: #93c5fd; }
+    body.dark .text-blue-500:hover { color: #bfdbfe; }
+    body.dark .text-green-500 { color: #6ee7b7; }
+    body.dark .text-green-500:hover { color: #a7f3d0; }
+    body.dark .text-gray-500 { color: #9ca3af; }
+    body.dark .text-gray-500:hover { color: #d1d5db; }
+    
+    /* Gradient header */
+    .gradient-header {
+      background:linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e293b 100%);
+      position:relative; overflow:hidden;
+    }
+    .gradient-header::before {
+      content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+      background:radial-gradient(circle at 30% 50%, rgba(59,130,246,0.1) 0%, transparent 50%);
+      pointer-events:none;
+    }
+    
+    /* Modal */
+    .modal {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;
+    }
+    .modal.show { display:flex; }
+    .modal-content {
+      background:white; border-radius:1rem; padding:2rem; max-width:500px; width:90%;
+      max-height:80vh; overflow-y:auto;
+    }
+    body.dark .modal-content { background:#1f2937; color:white; }
+    
+    /* Map container */
+    #map {
+      height: 400px;
+      width: 100%;
+      border-radius: 0.75rem;
+      transform: none;
+      z-index: auto;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 transition-colors duration-300">
+
+<!-- Loading & Toast -->
+<div id="loadingOverlay" class="loading-overlay"><div class="loading-spinner"></div></div>
+<div id="toast" class="toast"><i class="fas fa-check-circle mr-2 text-green-400"></i><span id="toastMessage">Action completed</span></div>
+
+<!-- Sensor Detail Modal -->
+<div id="sensorModal" class="modal" onclick="if(event.target===this) closeModal()">
+  <div class="modal-content">
+    <h2 class="text-2xl font-bold mb-4" id="modalTitle">Sensor Details</h2>
+    <div id="modalBody"></div>
+    <button class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="gradient-header text-white sticky top-0 z-50 shadow-xl">
+  <div class="max-w-7xl mx-auto px-6 py-4">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-4">
+        <div class="bg-blue-500/20 p-3 rounded-2xl backdrop-blur-sm"><i class="fas fa-volume-up text-3xl text-blue-300"></i></div>
+        <div><h1 class="text-3xl md:text-4xl font-bold tracking-tight">Urban Noise<span class="text-blue-400">Pollution</span></h1><p class="text-blue-200 text-sm mt-1">Smart City Monitoring Platform</p></div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
+          <span class="relative flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>
+          <span class="text-sm font-medium">LIVE</span>
+        </div>
+        <div class="hidden md:block bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm"><i class="far fa-calendar mr-2"></i><span id="currentDateTime"></span></div>
+        <button id="themeToggle" class="bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full transition-all" onclick="toggleTheme()"><i id="themeIcon" class="fas fa-moon"></i></button>
+        <button id="exportBtn" class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-full text-sm font-medium transition-all transform hover:scale-105 hidden md:block" onclick="exportData()"><i class="fas fa-download mr-2"></i>Export Report</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+      <div class="bg-white/5 rounded-xl p-3 backdrop-blur-sm"><div class="text-blue-300 text-sm">AQI Today</div><div class="text-xl font-bold">142 <span class="text-sm text-yellow-300">(Moderate)</span></div></div>
+      <div class="bg-white/5 rounded-xl p-3 backdrop-blur-sm"><div class="text-blue-300 text-sm">Active Sensors</div><div class="text-xl font-bold">24/30 <span class="text-sm text-green-300">● 80%</span></div></div>
+      <div class="bg-white/5 rounded-xl p-3 backdrop-blur-sm"><div class="text-blue-300 text-sm">Data Points</div><div class="text-xl font-bold">1.2M <span class="text-sm text-blue-300">today</span></div></div>
+      <div class="bg-white/5 rounded-xl p-3 backdrop-blur-sm"><div class="text-blue-300 text-sm">Last Update</div><div class="text-xl font-bold"><span id="lastUpdate">2s ago</span></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-7xl mx-auto px-6 py-8">
+  <!-- Time Range + Action Buttons -->
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+    <div class="flex items-center space-x-2 bg-white rounded-full shadow-md p-1">
+      <button class="time-range-btn px-4 py-2 rounded-full text-sm font-medium transition-all" onclick="setTimeRange('24h', this)">24 Hours</button>
+      <button class="time-range-btn px-4 py-2 rounded-full text-sm font-medium transition-all bg-blue-500 text-white" onclick="setTimeRange('7d', this)">7 Days</button>
+      <button class="time-range-btn px-4 py-2 rounded-full text-sm font-medium transition-all" onclick="setTimeRange('30d', this)">30 Days</button>
+      <button class="time-range-btn px-4 py-2 rounded-full text-sm font-medium transition-all" onclick="setTimeRange('custom', this)">Custom</button>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button class="bg-white p-2 rounded-lg shadow-md hover:shadow-lg transition" onclick="refreshData()"><i class="fas fa-sync-alt"></i></button>
+      <button class="bg-white p-2 rounded-lg shadow-md hover:shadow-lg transition" onclick="toggleFilter()"><i class="fas fa-filter"></i></button>
+      <button class="bg-white p-2 rounded-lg shadow-md hover:shadow-lg transition" onclick="toggleChartView()"><i class="fas fa-chart-pie"></i></button>
+    </div>
+  </div>
+
+  <!-- Filter Panel (hidden by default) -->
+  <div id="filterPanel" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden transition-all">
+    <h3 class="font-semibold mb-4">Filter Data</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div><label class="block text-sm text-gray-600 dark:text-gray-300 mb-2">City</label><select class="w-full border rounded-lg px-3 py-2" id="cityFilter"><option>All Cities</option><option>Delhi</option><option>Mumbai</option><option>Bangalore</option></select></div>
+      <div><label class="block text-sm text-gray-600 dark:text-gray-300 mb-2">Noise Level</label><select class="w-full border rounded-lg px-3 py-2" id="levelFilter"><option>All Levels</option><option>Critical (>85 dB)</option><option>Warning (65-85 dB)</option><option>Normal (<65 dB)</option></select></div>
+      <div><label class="block text-sm text-gray-600 dark:text-gray-300 mb-2">Date Range</label><input type="date" class="w-full border rounded-lg px-3 py-2" id="dateFilter"></div>
+      <div class="flex items-end"><button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="applyFilter()">Apply Filter</button></div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover border-l-4 border-blue-500 slide-in"><div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Average Noise</h2><div class="bg-blue-100 p-3 rounded-xl"><i class="fas fa-microphone-alt text-xl text-blue-500"></i></div></div><div class="flex items-end justify-between"><div><p class="text-4xl font-bold text-gray-800">78 <span class="text-lg text-gray-500">dB</span></p><p class="text-sm text-gray-500 mt-1">vs 76 dB yesterday</p></div><span class="text-red-500 text-sm font-medium bg-red-50 px-3 py-1 rounded-full"><i class="fas fa-arrow-up mr-1"></i>2.6%</span></div></div>
+    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover border-l-4 border-purple-500 slide-in"><div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Noisiest Area</h2><div class="bg-purple-100 p-3 rounded-xl"><i class="fas fa-map-marker-alt text-xl text-purple-500"></i></div></div><div class="flex items-end justify-between"><div><p class="text-4xl font-bold text-gray-800">Delhi</p><p class="text-sm text-gray-500 mt-1">CBD District</p></div><span class="text-purple-500 text-sm font-medium bg-purple-50 px-3 py-1 rounded-full"><i class="fas fa-exclamation-triangle mr-1"></i>Critical</span></div></div>
+    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover border-l-4 border-orange-500 slide-in"><div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Peak Hours</h2><div class="bg-orange-100 p-3 rounded-xl"><i class="fas fa-clock text-xl text-orange-500"></i></div></div><div class="flex items-end justify-between"><div><p class="text-4xl font-bold text-gray-800">5-8 PM</p><p class="text-sm text-gray-500 mt-1">Evening Rush</p></div><span class="text-orange-500 text-sm font-medium bg-orange-50 px-3 py-1 rounded-full">82 dB avg</span></div></div>
+    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover border-l-4 border-green-500 slide-in"><div class="flex items-center justify-between mb-3"><h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Health Impact</h2><div class="bg-green-100 p-3 rounded-xl"><i class="fas fa-heartbeat text-xl text-green-500"></i></div></div><div><p class="text-2xl font-bold text-gray-800">2.4M <span class="text-sm text-gray-500">exposed</span></p><p class="text-sm text-gray-500 mt-1">12 high-risk areas</p></div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="chart-container"><div class="flex items-center justify-between mb-4"><div><h3 class="text-lg font-semibold text-gray-800">Real-time Noise Levels</h3><p class="text-sm text-gray-500">Current readings</p></div><div class="flex items-center space-x-2"><span class="noise-indicator noise-safe"></span><span class="text-xs">Safe</span><span class="noise-indicator noise-moderate"></span><span class="text-xs">Moderate</span><span class="noise-indicator noise-high"></span><span class="text-xs">High</span></div></div><div class="chart-wrapper"><canvas id="noiseChart"></canvas></div></div>
+    <div class="chart-container"><div class="flex items-center justify-between mb-4"><div><h3 class="text-lg font-semibold text-gray-800">24-Hour Trend</h3><p class="text-sm text-gray-500">Hourly averages</p></div><select id="trendType" class="text-sm border rounded-lg px-3 py-1 bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600" onchange="updateTrendType(this.value)"><option value="weekdays">Weekdays</option><option value="weekends">Weekends</option><option value="holidays">Holidays</option></select></div><div class="chart-wrapper"><canvas id="timeChart"></canvas></div></div>
+    <div class="chart-container"><div class="flex items-center justify-between mb-4"><div><h3 class="text-lg font-semibold text-gray-800">City Comparison</h3><p class="text-sm text-gray-500">Top 5 noisiest cities</p></div><i class="fas fa-trophy text-yellow-400 text-xl"></i></div><div class="chart-wrapper"><canvas id="topLocationsChart"></canvas></div></div>
+    <div class="chart-container"><div class="flex items-center justify-between mb-4"><div><h3 class="text-lg font-semibold text-gray-800">Weekly Pattern</h3><p class="text-sm text-gray-500">Day-wise distribution</p></div><div class="bg-blue-50 text-blue-600 text-xs px-3 py-1 rounded-full"><i class="fas fa-chart-line mr-1"></i>+5% vs last week</div></div><div class="chart-wrapper"><canvas id="dailyTrendChart"></canvas></div></div>
+  </div>
+
+  <!-- Data Table -->
+  <div class="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-gray-800">Detailed Sensor Data</h3>
+      <div>
+        <button class="text-blue-500 hover:text-blue-600 text-sm font-medium mr-4" onclick="exportTableData()"><i class="fas fa-download mr-1"></i>Export CSV</button>
+        <button class="text-blue-500 hover:text-blue-600 text-sm font-medium" onclick="viewAllSensors()">View All <i class="fas fa-arrow-right ml-1"></i></button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" id="sensorTable">
+        <thead class="bg-gray-50 text-gray-600">
+          <tr>
+            <th class="px-6 py-3 text-left">Location</th>
+            <th class="px-6 py-3 text-left">Sensor ID</th>
+            <th class="px-6 py-3 text-left">Current Level</th>
+            <th class="px-6 py-3 text-left">Peak Today</th>
+            <th class="px-6 py-3 text-left">Status</th>
+            <th class="px-6 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <tr><td class="px-6 py-4">Downtown</td><td class="px-6 py-4">SN-001</td><td class="px-6 py-4 font-medium">85 dB</td><td class="px-6 py-4">94 dB</td><td class="px-6 py-4"><span class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs">Critical</span></td><td class="px-6 py-4"><button class="text-blue-500 hover:text-blue-700 mr-2" onclick="viewSensorDetails('SN-001')"><i class="fas fa-eye"></i></button><button class="text-green-500 hover:text-green-700 mr-2" onclick="alertSensor('SN-001')"><i class="fas fa-bell"></i></button><button class="text-gray-500 hover:text-gray-700" onclick="exportSensorData('SN-001')"><i class="fas fa-download"></i></button></td></tr>
+          <tr><td class="px-6 py-4">Residential A</td><td class="px-6 py-4">SN-002</td><td class="px-6 py-4 font-medium">62 dB</td><td class="px-6 py-4">68 dB</td><td class="px-6 py-4"><span class="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs">Normal</span></td><td class="px-6 py-4"><button class="text-blue-500 hover:text-blue-700 mr-2" onclick="viewSensorDetails('SN-002')"><i class="fas fa-eye"></i></button><button class="text-green-500 hover:text-green-700 mr-2" onclick="alertSensor('SN-002')"><i class="fas fa-bell"></i></button><button class="text-gray-500 hover:text-gray-700" onclick="exportSensorData('SN-002')"><i class="fas fa-download"></i></button></td></tr>
+          <tr><td class="px-6 py-4">Industrial Zone</td><td class="px-6 py-4">SN-003</td><td class="px-6 py-4 font-medium">92 dB</td><td class="px-6 py-4">95 dB</td><td class="px-6 py-4"><span class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs">Critical</span></td><td class="px-6 py-4"><button class="text-blue-500 hover:text-blue-700 mr-2" onclick="viewSensorDetails('SN-003')"><i class="fas fa-eye"></i></button><button class="text-green-500 hover:text-green-700 mr-2" onclick="alertSensor('SN-003')"><i class="fas fa-bell"></i></button><button class="text-gray-500 hover:text-gray-700" onclick="exportSensorData('SN-003')"><i class="fas fa-download"></i></button></td></tr>
+          <tr class="hidden more-sensors"><td class="px-6 py-4">Airport</td><td class="px-6 py-4">SN-004</td><td class="px-6 py-4 font-medium">88 dB</td><td class="px-6 py-4">92 dB</td><td class="px-6 py-4"><span class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs">Critical</span></td><td class="px-6 py-4"><button class="text-blue-500 hover:text-blue-700 mr-2" onclick="viewSensorDetails('SN-004')"><i class="fas fa-eye"></i></button><button class="text-green-500 hover:text-green-700 mr-2" onclick="alertSensor('SN-004')"><i class="fas fa-bell"></i></button><button class="text-gray-500 hover:text-gray-700" onclick="exportSensorData('SN-004')"><i class="fas fa-download"></i></button></td></tr>
+          <tr class="hidden more-sensors"><td class="px-6 py-4">Park</td><td class="px-6 py-4">SN-005</td><td class="px-6 py-4 font-medium">48 dB</td><td class="px-6 py-4">52 dB</td><td class="px-6 py-4"><span class="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs">Normal</span></td><td class="px-6 py-4"><button class="text-blue-500 hover:text-blue-700 mr-2" onclick="viewSensorDetails('SN-005')"><i class="fas fa-eye"></i></button><button class="text-green-500 hover:text-green-700 mr-2" onclick="alertSensor('SN-005')"><i class="fas fa-bell"></i></button><button class="text-gray-500 hover:text-gray-700" onclick="exportSensorData('SN-005')"><i class="fas fa-download"></i></button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Map (now at the very bottom) -->
+  <div class="bg-white rounded-2xl shadow-lg p-6 mt-8">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+      <div class="flex items-center space-x-3">
+        <div><h3 class="text-lg font-semibold text-gray-800">Live Monitoring Network</h3><p class="text-sm text-gray-500">Click markers for details</p></div>
+        <span id="sensorStatus" class="bg-green-100 text-green-600 text-xs font-medium px-3 py-1.5 rounded-full flex items-center"><span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>24 Online · 6 Warning</span>
+      </div>
+      <div class="flex space-x-2">
+        <button id="heatmapBtn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition flex items-center" onclick="toggleMapLayer('heatmap')"><i class="fas fa-layer-group mr-2"></i>Heatmap</button>
+        <button id="sensorsBtn" class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg text-sm transition flex items-center" onclick="toggleMapLayer('sensors')"><i class="fas fa-map-marker-alt mr-2"></i>Sensors</button>
+        <button class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition flex items-center" onclick="toggleFullscreen()"><i class="fas fa-expand-arrows-alt mr-2"></i>Fullscreen</button>
+      </div>
+    </div>
+    <div class="relative">
+      <div id="map" class="h-96 rounded-xl overflow-hidden border-2 border-gray-100"></div>
+      <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg text-sm">
+        <h4 class="font-semibold mb-2">Noise Levels</h4>
+        <div class="space-y-1"><div class="flex items-center"><span class="noise-indicator noise-safe"></span> Safe (&lt;65 dB)</div><div class="flex items-center"><span class="noise-indicator noise-moderate"></span> Moderate (65-75 dB)</div><div class="flex items-center"><span class="noise-indicator noise-high"></span> High (&gt;75 dB)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== GLOBAL VARIABLES ==========
+let charts = {};
+let map = null;
+let sensorMarkers = [];
+let currentMapLayer = 'sensors';
+let allSensorsShown = false; // for View All
+
+// ========== UTILITY FUNCTIONS ==========
+function showToast(message, type = 'success') {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMessage').textContent = message;
+  toast.querySelector('i').className = type === 'error' ? 'fas fa-exclamation-circle mr-2 text-red-400' : 'fas fa-check-circle mr-2 text-green-400';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+function showLoading(show = true) {
+  document.getElementById('loadingOverlay').classList.toggle('show', show);
+}
+
+// ========== THEME ==========
+function toggleTheme() {
+  document.body.classList.toggle('dark');
+  const icon = document.getElementById('themeIcon');
+  icon.className = document.body.classList.contains('dark') ? 'fas fa-sun' : 'fas fa-moon';
+  showToast(document.body.classList.contains('dark') ? 'Dark mode enabled' : 'Light mode enabled');
+}
+
+// ========== TIME RANGE ==========
+function setTimeRange(range, btn) {
+  document.querySelectorAll('.time-range-btn').forEach(b => {
+    b.classList.remove('bg-blue-500', 'text-white');
+  });
+  btn.classList.add('bg-blue-500', 'text-white');
+  
+  showLoading(true);
+  setTimeout(() => {
+    // Update only time-dependent charts
+    let lineData, lineLabels, radarData;
+    if (range === '24h') {
+      lineLabels = ['12AM','3AM','6AM','9AM','12PM','3PM','6PM','9PM'];
+      lineData = [42,38,45,72,68,65,82,58];
+      radarData = [72,75,74,78,82,68,65];
+    } else if (range === '7d') {
+      lineLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      lineData = [72,75,74,78,82,68,65];
+      radarData = [72,75,74,78,82,68,65];
+    } else if (range === '30d') {
+      lineLabels = ['Week 1','Week 2','Week 3','Week 4'];
+      lineData = [74,76,73,78];
+      radarData = [70,72,71,75,79,65,62]; // last week pattern
+    } else {
+      showToast('Custom range: please use filter panel');
+      showLoading(false);
+      return;
+    }
+    
+    if (charts.timeChart) {
+      charts.timeChart.data.labels = lineLabels;
+      charts.timeChart.data.datasets[0].data = lineData;
+      charts.timeChart.update();
+    }
+    if (charts.dailyTrendChart) {
+      charts.dailyTrendChart.data.datasets[0].data = radarData;
+      charts.dailyTrendChart.update();
+    }
+    
+    // Update map status and table values
+    updateMapForTimeRange(range);
+    updateTableForTimeRange(range);
+    
+    showLoading(false);
+    showToast(`Showing data for ${range}`);
+  }, 800);
+}
+function updateMapForTimeRange(range) {
+  const status = document.getElementById('sensorStatus');
+  if (range === '24h') status.innerHTML = '<span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>24 Online · 6 Warning';
+  else if (range === '7d') status.innerHTML = '<span class="w-2 h-2 bg-yellow-500 rounded-full mr-2 animate-pulse"></span>22 Online · 8 Warning';
+  else if (range === '30d') status.innerHTML = '<span class="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></span>18 Online · 12 Warning';
+}
+function updateTableForTimeRange(range) {
+  const rows = document.querySelectorAll('#sensorTable tbody tr:not(.more-sensors)');
+  if (range === '7d') {
+    rows[0].cells[2].innerHTML = '82 dB'; rows[0].cells[3].innerHTML = '90 dB';
+    rows[1].cells[2].innerHTML = '60 dB'; rows[1].cells[3].innerHTML = '66 dB';
+    rows[2].cells[2].innerHTML = '88 dB'; rows[2].cells[3].innerHTML = '92 dB';
+  } else if (range === '30d') {
+    rows[0].cells[2].innerHTML = '79 dB'; rows[0].cells[3].innerHTML = '88 dB';
+    rows[1].cells[2].innerHTML = '58 dB'; rows[1].cells[3].innerHTML = '64 dB';
+    rows[2].cells[2].innerHTML = '85 dB'; rows[2].cells[3].innerHTML = '90 dB';
+  } else {
+    rows[0].cells[2].innerHTML = '85 dB'; rows[0].cells[3].innerHTML = '94 dB';
+    rows[1].cells[2].innerHTML = '62 dB'; rows[1].cells[3].innerHTML = '68 dB';
+    rows[2].cells[2].innerHTML = '92 dB'; rows[2].cells[3].innerHTML = '95 dB';
+  }
+}
+
+// ========== REFRESH DATA ==========
+function refreshData() {
+  const btn = event.currentTarget;
+  btn.innerHTML = '<i class="fas fa-sync-alt animate-spin-slow"></i>';
+  showLoading(true);
+  setTimeout(() => {
+    btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+    showLoading(false);
+    showToast('Data refreshed');
+    document.getElementById('lastUpdate').textContent = 'Just now';
+    setTimeout(() => document.getElementById('lastUpdate').textContent = '2s ago', 2000);
+  }, 1500);
+}
+
+// ========== FILTER PANEL ==========
+function toggleFilter() {
+  const panel = document.getElementById('filterPanel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) showToast('Filter panel opened');
+}
+function applyFilter() {
+  const city = document.getElementById('cityFilter').value;
+  const level = document.getElementById('levelFilter').value;
+  const date = document.getElementById('dateFilter').value;
+  showLoading(true);
+  setTimeout(() => {
+    showLoading(false);
+    showToast(`Filters applied: ${city}, ${level}, ${date || 'any date'}`);
+    // Optionally update charts here
+  }, 1000);
+}
+
+// ========== CHART VIEW TOGGLE ==========
+let chartViewCompact = false;
+function toggleChartView() {
+  const containers = document.querySelectorAll('.chart-container');
+  chartViewCompact = !chartViewCompact;
+  containers.forEach(c => {
+    if (chartViewCompact) {
+      c.style.transform = 'scale(0.95)';
+      c.style.margin = '-10px';
+    } else {
+      c.style.transform = 'scale(1)';
+      c.style.margin = '0';
+    }
+  });
+  showToast(chartViewCompact ? 'Compact view' : 'Normal view');
+}
+
+// ========== TREND TYPE ==========
+function updateTrendType(type) {
+  const data = { weekdays:[42,38,45,72,68,65,82,58], weekends:[38,35,42,58,62,70,75,60], holidays:[30,28,35,48,52,55,50,40] };
+  if (charts.timeChart) {
+    charts.timeChart.data.datasets[0].data = data[type];
+    charts.timeChart.update();
+  }
+  showToast(`Showing ${type} trend`);
+}
+
+// ========== MAP FUNCTIONS ==========
+function toggleMapLayer(layer) {
+  const heatBtn = document.getElementById('heatmapBtn');
+  const sensBtn = document.getElementById('sensorsBtn');
+  if (layer === 'heatmap') {
+    heatBtn.classList.add('bg-blue-500','text-white');
+    heatBtn.classList.remove('bg-gray-100');
+    sensBtn.classList.remove('bg-blue-500','text-white');
+    sensBtn.classList.add('bg-gray-100');
+    // Simulate heatmap: reduce opacity
+    sensorMarkers.forEach(m => m.setStyle({ fillOpacity:0.2, weight:1, color:'#ff4444' }));
+    showToast('Heatmap view (simulated)');
+  } else {
+    sensBtn.classList.add('bg-blue-500','text-white');
+    sensBtn.classList.remove('bg-gray-100');
+    heatBtn.classList.remove('bg-blue-500','text-white');
+    heatBtn.classList.add('bg-gray-100');
+    // Restore markers
+    sensorMarkers.forEach(m => {
+      const level = m.options.level || 85;
+      const color = level > 80 ? '#ef4444' : level > 65 ? '#f59e0b' : '#10b981';
+      m.setStyle({ fillOpacity:0.7, weight:2, color:color, fillColor:color });
+    });
+    showToast('Sensor view');
+  }
+}
+function toggleFullscreen() {
+  const mapDiv = document.getElementById('map');
+  if (!document.fullscreenElement) mapDiv.requestFullscreen();
+  else document.exitFullscreen();
+}
+
+// ========== TABLE ACTIONS ==========
+function viewSensorDetails(id) {
+  const modal = document.getElementById('sensorModal');
+  const title = document.getElementById('modalTitle');
+  const body = document.getElementById('modalBody');
+  // Sample data
+  const data = { 'SN-001':{ loc:'Downtown', level:85, peak:94, status:'Critical' },
+                 'SN-002':{ loc:'Residential A', level:62, peak:68, status:'Normal' },
+                 'SN-003':{ loc:'Industrial Zone', level:92, peak:95, status:'Critical' },
+                 'SN-004':{ loc:'Airport', level:88, peak:92, status:'Critical' },
+                 'SN-005':{ loc:'Park', level:48, peak:52, status:'Normal' } };
+  const d = data[id] || { loc:'Unknown', level:0, peak:0, status:'Unknown' };
+  title.textContent = `Sensor ${id}`;
+  body.innerHTML = `<p><strong>Location:</strong> ${d.loc}</p><p><strong>Current Level:</strong> ${d.level} dB</p><p><strong>Peak Today:</strong> ${d.peak} dB</p><p><strong>Status:</strong> ${d.status}</p><p><strong>Last Calibration:</strong> 2025-02-15</p><p><strong>Battery:</strong> 87%</p>`;
+  modal.classList.add('show');
+}
+function closeModal() {
+  document.getElementById('sensorModal').classList.remove('show');
+}
+function alertSensor(id) {
+  showToast(`Alert set for sensor ${id} (simulated)`);
+}
+function exportSensorData(id) {
+  showLoading(true);
+  setTimeout(() => {
+    showLoading(false);
+    showToast(`Exported data for sensor ${id} (CSV)`);
+    // Simulate download
+    const csv = `Sensor ID,Timestamp,Noise Level\n${id},2025-03-07 10:00,85\n${id},2025-03-07 11:00,87`;
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `sensor_${id}.csv`; a.click();
+  }, 800);
+}
+function exportTableData() {
+  showLoading(true);
+  setTimeout(() => {
+    showLoading(false);
+    // Generate CSV from table
+    let csv = "Location,Sensor ID,Current Level,Peak Today,Status\n";
+    document.querySelectorAll('#sensorTable tbody tr').forEach(row => {
+      if (row.classList.contains('hidden')) return;
+      const cells = row.querySelectorAll('td');
+      csv += `${cells[0].innerText},${cells[1].innerText},${cells[2].innerText},${cells[3].innerText},${cells[4].innerText.replace(/<[^>]*>/g,'')}\n`;
+    });
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'sensor_data.csv'; a.click();
+    showToast('Table exported as CSV');
+  }, 800);
+}
+function viewAllSensors() {
+  const hiddenRows = document.querySelectorAll('.more-sensors');
+  allSensorsShown = !allSensorsShown;
+  hiddenRows.forEach(r => r.classList.toggle('hidden', !allSensorsShown));
+  showToast(allSensorsShown ? 'Showing all sensors' : 'Showing limited sensors');
+}
+
+// ========== EXPORT MAIN REPORT ==========
+function exportData() {
+  showLoading(true);
+  setTimeout(() => {
+    showLoading(false);
+    showToast('Full report exported (PDF simulation)');
+    const element = document.createElement('a');
+    element.href = 'data:application/octet-stream,' + encodeURIComponent('Noise Report\nDate: 2025-03-07\nAvg Noise:78 dB');
+    element.download = 'noise_report.txt';
+    element.click();
+  }, 1500);
+}
+
+// ========== INIT ==========
+document.addEventListener('DOMContentLoaded', function() {
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  const chartOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, animation:{duration:800} };
+  
+  // Noise Chart (static)
+  charts.noiseChart = new Chart(document.getElementById('noiseChart'), {
+    type:'bar',
+    data:{ labels:['Downtown','Residential','Industrial','Commercial','School','Hospital'],
+           datasets:[{ data:[85,62,92,78,55,58], backgroundColor:ctx => {
+             const val = ctx.dataset.data[ctx.dataIndex];
+             return val>80?'#ef4444':val>65?'#f59e0b':'#10b981';
+           }, borderRadius:8 }] },
+    options:chartOpts
+  });
+  
+  // Time Chart
+  charts.timeChart = new Chart(document.getElementById('timeChart'), {
+    type:'line',
+    data:{ labels:['12AM','3AM','6AM','9AM','12PM','3PM','6PM','9PM'],
+           datasets:[{ data:[42,38,45,72,68,65,82,58], borderColor:'#3b82f6', tension:0.4 }] },
+    options:chartOpts
+  });
+  
+  // Top Locations Chart
+  charts.topLocationsChart = new Chart(document.getElementById('topLocationsChart'), {
+    type:'doughnut',
+    data:{ labels:['Delhi','Mumbai','Bangalore','Chennai','Kolkata'],
+           datasets:[{ data:[94,89,85,82,79], backgroundColor:['#ef4444','#f59e0b','#3b82f6','#10b981','#8b5cf6'] }] },
+    options:{ ...chartOpts, cutout:'65%' }
+  });
+  
+  // Daily Trend Chart
+  charts.dailyTrendChart = new Chart(document.getElementById('dailyTrendChart'), {
+    type:'radar',
+    data:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+           datasets:[{ data:[72,75,74,78,82,68,65], backgroundColor:'rgba(59,130,246,0.2)', borderColor:'#3b82f6' }] },
+    options:chartOpts
+  });
+  
+  // Map
+  if (typeof L !== 'undefined') {
+    map = L.map('map').setView([28.6139,77.2090], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution:'©OpenStreetMap' }).addTo(map);
+    const sensors = [
+      { coords:[28.6139,77.2090], level:85, name:'CBD Delhi' },
+      { coords:[28.7041,77.1025], level:62, name:'North Delhi' },
+      { coords:[28.5355,77.3910], level:92, name:'Industrial Area' },
+      { coords:[28.5678,77.3210], level:78, name:'Commercial Hub' },
+      { coords:[28.4595,77.0266], level:55, name:'School Zone' }
+    ];
+    sensors.forEach(s => {
+      const color = s.level>80?'#ef4444':s.level>65?'#f59e0b':'#10b981';
+      const marker = L.circleMarker(s.coords, { radius:s.level/10, color:color, fillColor:color, fillOpacity:0.7, level:s.level })
+        .bindPopup(`<b>${s.name}</b><br>${s.level} dB`);
+      marker.addTo(map);
+      sensorMarkers.push(marker);
+    });
+  }
+  
+  // Date/Time
+  function updateDateTime() {
+    const now = new Date();
+    document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+  updateDateTime();
+  setInterval(updateDateTime,1000);
+  
+  // Last update simulation
+  setInterval(() => {
+    document.getElementById('lastUpdate').textContent = 'Just now';
+    setTimeout(() => document.getElementById('lastUpdate').textContent = '2s ago',2000);
+  },5000);
+  // Load dataset from backend
+loadBackendData();
+setInterval(loadBackendData, 5000);
+});
+async function loadBackendData() {
+
+  try {
+
+    const response = await fetch("http://localhost:3000/noise/average");
+
+    const data = await response.json();
+
+    console.log("Backend dataset:", data);
+
+    const labels = Object.keys(data);
+    const values = Object.values(data);
+
+    updateSensorTable(labels, values);
+
+    if (charts.noiseChart) {
+
+      charts.noiseChart.data = {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: values.map(v =>
+            v > 80 ? '#ef4444' :
+            v > 65 ? '#f59e0b' :
+            '#10b981'
+          ),
+          borderRadius: 8
+        }]
+      };
+
+      charts.noiseChart.update();
+    }
+
+    if (charts.topLocationsChart) {
+
+      charts.topLocationsChart.data = {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: [
+            '#ef4444','#f59e0b','#3b82f6','#10b981','#8b5cf6',
+            '#ec4899','#14b8a6','#f97316','#6366f1','#22c55e'
+          ]
+        }]
+      };
+
+      charts.topLocationsChart.update();
+    }
+
+  } catch (err) {
+    console.error("Backend connection failed", err);
+  }
+
+}
+function updateSensorTable(labels, values) {
+
+  const tableBody = document.querySelector("#sensorTable tbody");
+
+  tableBody.innerHTML = "";
+
+  labels.forEach((city, i) => {
+
+    const noise = values[i];
+
+    const status =
+      noise > 85 ? "Critical" :
+      noise > 65 ? "Warning" :
+      "Normal";
+
+    const statusColor =
+      noise > 85 ? "bg-red-100 text-red-600" :
+      noise > 65 ? "bg-yellow-100 text-yellow-600" :
+      "bg-green-100 text-green-600";
+
+    const row = `
+      <tr>
+        <td class="px-6 py-4">${city}</td>
+        <td class="px-6 py-4">SN-${i+1}</td>
+        <td class="px-6 py-4 font-medium">${noise.toFixed(1)} dB</td>
+        <td class="px-6 py-4">${(noise+5).toFixed(1)} dB</td>
+        <td class="px-6 py-4">
+          <span class="${statusColor} px-2 py-1 rounded-full text-xs">${status}</span>
+        </td>
+        <td class="px-6 py-4">—</td>
+      </tr>
+    `;
+
+    tableBody.innerHTML += row;
+
+  });
+
+}
+</script>
+</body>
+</html>
