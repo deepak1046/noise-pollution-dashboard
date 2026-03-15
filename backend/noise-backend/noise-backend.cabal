@@ -35,6 +35,7 @@ library
     , text
     , time
     , vector
+    , wai
     , wai-cors
   default-language: Haskell2010
 
@@ -48,5 +49,6 @@ executable noise-backend-exe
   build-depends:
       base >=4.7 && <5
     , noise-backend
+    , wai
     , wai-cors
   default-language: Haskell2010

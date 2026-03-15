@@ -3,7 +3,6 @@ version: 0.1.0.0
 
 dependencies:
 - base >= 4.7 && < 5
-- wai-cors
 
 library:
   source-dirs: src
@@ -19,6 +18,8 @@ library:
   - time
   - statistics
   - bytestring
+  - wai
+  - wai-cors
 
 executables:
   noise-backend-exe:
@@ -26,6 +27,9 @@ executables:
     source-dirs: app
     dependencies:
     - noise-backend
+    - base >= 4.7 && < 5
+    - wai
+    - wai-cors
     ghc-options:
     - -threaded
     - -rtsopts
