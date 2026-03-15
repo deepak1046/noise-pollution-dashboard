@@ -927,7 +927,8 @@ document.addEventListener('DOMContentLoaded', function() {
   Chart.defaults.font.family = "'Inter', sans-serif";
   const chartOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, animation:{duration:800} };
 
-  const RENDER_URL = "https://noise-backend.onrender.com";
+  // Only fallback to Render if we aren't running locally (allows fast testing)
+  const RENDER_URL = "https://noise-pollution-backend.onrender.com";
   const baseUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3000'
     : RENDER_URL;
